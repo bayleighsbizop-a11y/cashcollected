@@ -26,16 +26,16 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 24px;
+    padding: 20px;
   }
 
   .card {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 16px;
-    padding: 32px 36px;
+    padding: 28px 32px;
     width: 100%;
-    max-width: 340px;
+    max-width: 380px;
     position: relative;
     overflow: hidden;
   }
@@ -77,6 +77,70 @@
     box-shadow: 0 0 6px var(--accent-green);
   }
 
+  /* Date controls */
+  .date-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .date-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .date-label {
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .date-input {
+    background: #0d0d15;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    padding: 7px 10px;
+    width: 100%;
+    outline: none;
+    transition: border-color 0.2s;
+    color-scheme: dark;
+  }
+  .date-input:focus { border-color: var(--accent-green); }
+
+  /* Preset pills */
+  .presets {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 18px;
+  }
+
+  .preset-btn {
+    background: #0d0d15;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.03em;
+  }
+  .preset-btn:hover,
+  .preset-btn.active {
+    border-color: var(--accent-green);
+    color: var(--accent-green);
+    background: rgba(0,229,160,0.06);
+  }
+
   .value {
     font-family: 'DM Mono', monospace;
     font-size: 52px;
@@ -85,6 +149,7 @@
     line-height: 1;
     margin-bottom: 12px;
     letter-spacing: -0.02em;
+    transition: opacity 0.2s;
   }
 
   .value.loading-text {
@@ -102,6 +167,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    margin-top: 4px;
   }
 
   .sub {
@@ -135,11 +201,41 @@
     color: #ff5f5f;
     line-height: 1.5;
   }
+
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin-bottom: 18px;
+  }
 </style>
 </head>
 <body>
 <div class="card">
   <div class="label"><span class="label-dot"></span>Cash Collected</div>
+
+  <!-- Preset pills -->
+  <div class="presets">
+    <button class="preset-btn" onclick="setPreset('today')">Today</button>
+    <button class="preset-btn" onclick="setPreset('week')">This Week</button>
+    <button class="preset-btn" onclick="setPreset('month')">This Month</button>
+    <button class="preset-btn" onclick="setPreset('quarter')">This Quarter</button>
+    <button class="preset-btn active" onclick="setPreset('all')">All Time</button>
+  </div>
+
+  <!-- Date pickers -->
+  <div class="date-row">
+    <div class="date-group">
+      <span class="date-label">From</span>
+      <input type="date" class="date-input" id="dateFrom" onchange="onDateChange()">
+    </div>
+    <div class="date-group">
+      <span class="date-label">To</span>
+      <input type="date" class="date-input" id="dateTo" onchange="onDateChange()">
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
   <div class="value loading-text" id="value">Loading...</div>
   <div class="sub-row">
     <div class="sub" id="sub"></div>
@@ -158,6 +254,45 @@ function parseAmt(val) {
   if (!val) return 0;
   const n = parseFloat(String(val).replace(/[^0-9.]/g, ''));
   return isNaN(n) ? 0 : n;
+}
+
+function toDateStr(d) {
+  return d.toISOString().split('T')[0];
+}
+
+function setPreset(preset) {
+  // Update active button
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+
+  const now = new Date();
+  let from, to;
+  to = toDateStr(now);
+
+  if (preset === 'today') {
+    from = toDateStr(now);
+  } else if (preset === 'week') {
+    const d = new Date(now);
+    d.setDate(d.getDate() - d.getDay() + (d.getDay() === 0 ? -6 : 1));
+    from = toDateStr(d);
+  } else if (preset === 'month') {
+    from = toDateStr(new Date(now.getFullYear(), now.getMonth(), 1));
+  } else if (preset === 'quarter') {
+    const q = Math.floor(now.getMonth() / 3);
+    from = toDateStr(new Date(now.getFullYear(), q * 3, 1));
+  } else if (preset === 'all') {
+    from = '';
+    to = '';
+  }
+
+  document.getElementById('dateFrom').value = from;
+  document.getElementById('dateTo').value   = to;
+  loadData();
+}
+
+function onDateChange() {
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  loadData();
 }
 
 async function fetchAllWon() {
@@ -181,7 +316,7 @@ async function fetchAllWon() {
 }
 
 async function loadData() {
-  const btn = document.getElementById('refreshBtn');
+  const btn   = document.getElementById('refreshBtn');
   const valEl = document.getElementById('value');
   const subEl = document.getElementById('sub');
   btn.disabled = true;
@@ -189,8 +324,24 @@ async function loadData() {
   valEl.textContent = 'Loading...';
   subEl.innerHTML = '';
 
+  const fromVal = document.getElementById('dateFrom').value;
+  const toVal   = document.getElementById('dateTo').value;
+  const fromDate = fromVal ? new Date(fromVal + 'T00:00:00') : null;
+  const toDate   = toVal   ? new Date(toVal   + 'T23:59:59') : null;
+
   try {
-    const opps = await fetchAllWon();
+    let opps = await fetchAllWon();
+
+    // Filter by date range using lastStageChangeAt or createdAt
+    if (fromDate || toDate) {
+      opps = opps.filter(o => {
+        const d = new Date(o.lastStageChangeAt || o.createdAt);
+        if (fromDate && d < fromDate) return false;
+        if (toDate   && d > toDate)   return false;
+        return true;
+      });
+    }
+
     let total = 0;
     opps.forEach(o => {
       const f = (o.customFields || []).find(f => f.id === CASH_ID);
@@ -200,8 +351,12 @@ async function loadData() {
     valEl.className = 'value';
     valEl.textContent = fmt(total);
 
+    const rangeLabel = fromVal && toVal
+      ? `${fromVal} → ${toVal}`
+      : fromVal ? `From ${fromVal}` : toVal ? `To ${toVal}` : 'All time';
     const now = new Date().toLocaleString('en-AU', { timeStyle: 'short' });
-    subEl.innerHTML = `<strong>${opps.length} won deals</strong> · ${now}`;
+    subEl.innerHTML = `<strong>${opps.length} deals</strong> · ${rangeLabel}`;
+
   } catch (e) {
     valEl.className = 'value';
     valEl.innerHTML = `<span class="error-text">⚠ ${e.message}</span>`;
@@ -210,6 +365,7 @@ async function loadData() {
   btn.disabled = false;
 }
 
+// Init — set "All Time" as default with no dates
 loadData();
 </script>
 </body>
